@@ -72,23 +72,61 @@ export const getProduct = async (req: Request, res: Response) => {
   res.json({ product: { ...product, discount } });
 };
 
+const parseProductBody = (body: any) => {
+  const data: Record<string, unknown> = {};
+
+  if (body.name !== undefined) data.name = String(body.name);
+  if (body.description !== undefined)
+    data.description = String(body.description);
+  if (body.image !== undefined) data.image = String(body.image);
+  if (body.category !== undefined) data.category = String(body.category);
+  if (body.unit !== undefined) data.unit = String(body.unit);
+
+  if (body.price !== undefined) data.price = Number(body.price);
+  if (body.originalPrice !== undefined)
+    data.originalPrice =
+      body.originalPrice === "" || body.originalPrice === null
+        ? null
+        : Number(body.originalPrice);
+  if (body.stock !== undefined) data.stock = parseInt(body.stock, 10);
+
+  if (body.isOrganic !== undefined)
+    data.isOrganic = body.isOrganic === true || body.isOrganic === "true";
+
+  return data;
+};
+
 // POST /api/products
 export const createProduct = async (req: Request, res: Response) => {
-  const product = await prisma.product.create({ data: req.body });
+  const data = parseProductBody(req.body);
+  const product = await prisma.product.create({ data: data as any });
   res.status(201).json({ product });
 };
 
 // PUT /api/product/:id
 export const updateProduct = async (req: Request, res: Response) => {
+  const data = parseProductBody(req.body);
+
+  if (
+    (data.price !== undefined && Number.isNaN(data.price)) ||
+    (data.stock !== undefined && Number.isNaN(data.stock))
+  ) {
+    res.status(400).json({ message: "price and stock must be valid numbers" });
+    return;
+  }
+
   const product = await prisma.product.update({
     where: { id: req.params.id as string },
-    data: req.body,
+    data: data as any,
   });
   res.json({ product });
 };
 
 // DELETE /api/product/:id
 export const deleteProduct = async (req: Request, res: Response) => {
-  await prisma.product.delete({ where: { id: req.params.id as string } });
-  res.json({ message: "Deleted" });
+  await prisma.product.update({
+    where: { id: req.params.id as string },
+    data: { stock: Number(0) },
+  });
+  res.json({ message: "Product Updated" });
 };

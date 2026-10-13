@@ -13,8 +13,8 @@ const adminRouter = express.Router();
 
 adminRouter.get("/stats", auth, admin, getAdminStats);
 adminRouter.get("/delivery-partners", auth, admin, getDeliveryPartners);
-adminRouter.get("/delivery-partners", auth, admin, createDeliveryPartner);
-adminRouter.get("/delivery-partners/:id", auth, admin, udpateDeliveryPartner);
-adminRouter.get("/orders/:id/assign", auth, admin, assignDeliveryPartner);
+adminRouter.post("/delivery-partners", auth, admin, createDeliveryPartner);
+adminRouter.put("/delivery-partners/:id", auth, admin, udpateDeliveryPartner);
+adminRouter.put("/orders/:id/assign", auth, admin, assignDeliveryPartner);
 
 export default adminRouter;

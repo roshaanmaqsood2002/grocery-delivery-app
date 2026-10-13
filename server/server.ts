@@ -6,19 +6,25 @@ import productRouter from "./routes/productRoutes.js";
 import upploadRouter from "./routes/uploadRoutes.js";
 import orderRouter from "./routes/orderRoutes.js";
 import { serve } from "inngest/express";
-import { inngest, functions } from "./inngest/index.js"
+import { inngest, functions } from "./inngest/index.js";
 import addressRouter from "./routes/addressRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
 import deliveryPartnerRouter from "./routes/deliveryPartnerRoutes.js";
+import { stripeWebhook } from "./controllers/webhook.js";
 
 const app = express();
+
+app.post(
+  "/api/stripe",
+  express.raw({ type: "application/json" }),
+  stripeWebhook,
+);
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 const port = process.env.PORT || 5000;
-
 
 // Endpoints
 app.use("/api/auth", authRouter);

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { dummyAddressData } from "../assets/assets";
 import {
   ArrowLeft,
   CheckIcon,
@@ -12,18 +11,21 @@ import {
 import CheckoutAddress from "../components/Checkout/CheckoutAddress";
 import CheckoutPayment from "../components/Checkout/CheckoutPayment";
 import CheckoutReview from "../components/Checkout/CheckoutReview";
+import api from "../config/api";
+import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
 
 const Checkout = () => {
   const currency = import.meta.env.VITE_CURRENCY_SYMBOL || "$";
   const navigate = useNavigate();
 
-  const { items, cartTotal } = useCart();
-  const { user } = { user: { addresses: dummyAddressData } };
+  const { items, cartTotal, clearCart } = useCart();
+  const { user } = useAuth();
 
   const [step, setStep] = useState("address");
   const [loading, setLoading] = useState(false);
   const [address, setAddress] = useState({
-    _id: "",
+    id: "",
     label: "Home",
     address: "",
     city: "",
@@ -33,7 +35,7 @@ const Checkout = () => {
     lat: 0,
     lng: 0,
   });
-  const [paymenthMethod, setpaymenthMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState("card");
   const deliveryFee = cartTotal > 20 ? 0 : 1.99;
   const tax = cartTotal * 0.08;
   const total = cartTotal + deliveryFee + tax;
@@ -46,7 +48,32 @@ const Checkout = () => {
 
   const handlePlaceholder = async () => {
     setLoading(true);
-    navigate("/orders");
+    try {
+      const orderData = {
+        items: items.map((item) => ({
+          product: item.product.id,
+          quantity: item.quantity,
+        })),
+        shippingAddress: address,
+        paymentMethod,
+      };
+
+      const { data } = await api.post("/orders", orderData);
+      console.log(data);
+
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      clearCart();
+      toast.success("Order placed successfully");
+      navigate(`/orders/${data.order.id}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error.message);
+    } finally {
+      setLoading(false);
+      scrollTo(0, 0);
+    }
   };
 
   // Populate address from users's default address
@@ -55,7 +82,7 @@ const Checkout = () => {
       const defaultAddr =
         user.addresses.find((a) => a.isDefault) || user.addresses[0];
       setAddress({
-        _id: defaultAddr?._id,
+        id: defaultAddr?.id,
         label: defaultAddr.label,
         address: defaultAddr.address,
         city: defaultAddr.city,
@@ -132,8 +159,8 @@ const Checkout = () => {
 
             {step === "payment" && (
               <CheckoutPayment
-                paymentMethod={paymenthMethod}
-                setPaymentMethod={setpaymenthMethod}
+                paymentMethod={paymentMethod}
+                setPaymentMethod={setPaymentMethod}
                 setStep={setStep}
               />
             )}
@@ -184,7 +211,7 @@ const Checkout = () => {
                 </span>
               </div>
 
-                  <div className="flex justify-between pt-3 border-t border-app-border text-base font-semibold">
+              <div className="flex justify-between pt-3 border-t border-app-border text-base font-semibold">
                 <span className="text-app-text-light">Total</span>
                 <span className="text-app-green">
                   {currency}

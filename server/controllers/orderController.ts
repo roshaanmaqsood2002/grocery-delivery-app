@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../config/prisma.js";
 import { inngest } from "../inngest/index.js";
+import Stripe from "stripe";
 
 // Create Order
 // POST /api/orders
@@ -13,7 +14,7 @@ export const createOrder = async (req: Request, res: Response) => {
   }
 
   // Look up actual prices from the database
-  const productIds = items.mao((i: any) => i.product);
+  const productIds = items.map((i: any) => i.product);
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
   });
@@ -72,6 +73,29 @@ export const createOrder = async (req: Request, res: Response) => {
 
   if (paymentMethod === "card") {
     // stripe payment link
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
+    // create session
+    const session = await stripe.checkout.sessions.create({
+      success_url: `${req.headers.origin}/orders?clearCart=true`,
+      cancel_url: `${req.headers.origin}/checkout`,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Payment Grocery",
+            },
+            unit_amount: Math.round(total * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      metadata: { orderId: order.id },
+    });
+
+    return res.json({ url: session.url });
   }
 
   res.json({ order });
@@ -85,11 +109,14 @@ export const createOrder = async (req: Request, res: Response) => {
   }
 
   // Send stock update events for each products in the order
-  for(const item of orderItems) {
-    await inngest.send({name: "inventory/stock.updated", data: {productId: item.product}})
+  for (const item of orderItems) {
+    await inngest.send({
+      name: "inventory/stock.updated",
+      data: { productId: item.product },
+    });
   }
 
-  await inngest.send({name: "order/placed", data: {orderId: order.id}})
+  await inngest.send({ name: "order/placed", data: { orderId: order.id } });
 };
 
 // Get user's orders
@@ -106,7 +133,7 @@ export const getUserOrders = async (req: Request, res: Response) => {
     where.status = status;
   }
 
-  const orders = prisma.order.findMany({
+  const orders = await prisma.order.findMany({
     where,
     include: { deliveryPartner: { select: { name: true, phone: true } } },
     orderBy: { createdAt: "desc" },
